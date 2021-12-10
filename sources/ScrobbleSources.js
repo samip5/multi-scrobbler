@@ -6,6 +6,7 @@ import {SubsonicSource} from "./SubsonicSource.js";
 import JellyfinSource from "./JellyfinSource.js";
 import LastfmSource from "./LastfmSource.js";
 import DeezerSource from "./DeezerSource.js";
+import AppleSource from "./AppleSource.js";
 
 export default class ScrobbleSources {
 
@@ -14,7 +15,7 @@ export default class ScrobbleSources {
     configDir;
     localUrl;
 
-    sourceTypes = ['spotify', 'plex', 'tautulli', 'subsonic', 'jellyfin', 'lastfm', 'deezer'];
+    sourceTypes = ['spotify', 'plex', 'tautulli', 'subsonic', 'jellyfin', 'lastfm', 'deezer', 'apple'];
 
     constructor(localUrl, configDir = process.cwd()) {
         this.configDir = configDir;
@@ -165,6 +166,24 @@ export default class ScrobbleSources {
                         accessToken: process.env.DEEZER_ACCESS_TOKEN,
                     };
                     break;
+                case 'apple':
+                    const a = {
+                        key: process.env.APPLE_KEY,
+                        keyId: process.env.APPLE_KEY_ID,
+                        teamId: process.env.APPLE_TEAM_ID,
+                        endpoint: process.env.APPLE_ENDPOINT,
+                        endpointAuth: process.env.APPLE_ENDPOINT_AUTH,
+                    };
+                    if (!Object.values(a).every(x => x === undefined)) {
+                        configs.push({
+                            type: 'apple',
+                            name: 'unnamed',
+                            source: 'ENV',
+                            mode: 'single',
+                            data: a
+                        })
+                    }
+                    break;
                 default:
                     break;
             }
@@ -300,6 +319,12 @@ export default class ScrobbleSources {
                 newSource = await new DeezerSource(name, {
                     ...data,
                     localUrl: this.localUrl,
+                    configDir: this.configDir
+                }, clients);
+                break;
+            case 'apple':
+                newSource = await new AppleSource(name, {
+                    ...data,
                     configDir: this.configDir
                 }, clients);
                 break;

@@ -348,6 +348,8 @@ const configDir = process.env.CONFIG_DIR || `${process.cwd()}/config`;
                 case 'deezer':
                     req.session.deezerSource = name;
                     return passport.authenticate(`deezer-${source.name}`)(req,res,next);
+                case 'apple':
+                    return res.render('apple', {token: source.generateDeveloperToken()})
                 default:
                     return res.status(400).send(`Specified source does not have auth implemented (${source.type})`);
             }
@@ -473,6 +475,16 @@ const configDir = process.env.CONFIG_DIR || `${process.cwd()}/config`;
                 } catch (e) {
                     return res.send(e.message);
                 }
+            } else if (req.url.includes('apple')) {
+                const {
+                    query: {
+                        token
+                    } = {}
+                } = req;
+                const entity = scrobbleSources.getByName(state);
+               await entity.handleAuthCodeCallback({token});
+               const recentPlays = await entity.apiClient.getRecentlyPlayed(20, 0, "songs");
+               const f = 1;
             } else {
                 logger.info('Received auth code callback from Spotify', {label: 'Spotify'});
                 const source = scrobbleSources.getByName(state);
@@ -486,6 +498,9 @@ const configDir = process.env.CONFIG_DIR || `${process.cwd()}/config`;
                 return res.send(responseContent);
             }
         });
+
+        const apl = scrobbleSources.getByName('aap');
+        await apl.doSomething();
 
         let anyNotReady = false;
         for (const source of scrobbleSources.sources.filter(x => x.canPoll === true)) {

@@ -35,10 +35,28 @@ export async function readJson(path, {logErrors = true, throwOnNotFound = true} 
     }
 }
 
-export async function readText(path) {
-    await promises.access(path, constants.R_OK);
-    const data = await promises.readFile(path);
-    return data.toString();
+export async function readText(path, {logErrors = true, throwOnNotFound = true} = {}) {
+    try {
+        await promises.access(path, constants.R_OK);
+        const data = await promises.readFile(path);
+        return data.toString();
+    } catch (e) {
+        const {code} = e;
+        if (code === 'ENOENT') {
+            if (throwOnNotFound) {
+                if (logErrors) {
+                    this.logger.warn('No file found at given path', {filePath: path});
+                }
+                throw e;
+            } else {
+                return;
+            }
+        } else if (logErrors) {
+            this.logger.warn(`Encountered error while parsing file`, {filePath: path});
+            this.logger.error(e);
+        }
+        throw e;
+    }
 
     // return new Promise((resolve, reject) => {
     //     fs.readFile(path, 'utf8', function (err, data) {
