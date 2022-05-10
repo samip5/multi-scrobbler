@@ -500,7 +500,7 @@ const configDir = process.env.CONFIG_DIR || `${process.cwd()}/config`;
         });
 
         const apl = scrobbleSources.getByName('aap');
-        await apl.doSomething();
+        //await apl.doSomething();
 
         let anyNotReady = false;
         for (const source of scrobbleSources.sources.filter(x => x.canPoll === true)) {

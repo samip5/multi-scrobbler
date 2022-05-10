@@ -88,7 +88,7 @@ export default class AppleSource extends AbstractSource {
             key: this.keyContents,
             teamId: this.config.teamId,
             keyId: this.config.keyId,
-            userToken: 'Ajwe9DQ1AennRPrvGMu1aTIm6Az9iZcVmavZODjRXFju1XFxpTuSnIWDTKeR9JaUCLYqFM1fd9d0eGS3UPBrjIQqLorbEn5BaTsdZpxeh8Lzsel3NI0e1d4CYjI9hair+YZpNW49KAG6IzjrxO+P4Cm+I5Q+VBJ9L9dTdf3yZ+ogLzybDwKx4jHCUjfLra3HymOx9yxQB3dk69eUltalMrfFIpBjljZbG1SQl+LO9k7emc29Tg==',
+            userToken: 'aToken',
         })
         try {
             const plays = await this.apiClient.getRecentlyPlayed(20, 0, 'songs');
