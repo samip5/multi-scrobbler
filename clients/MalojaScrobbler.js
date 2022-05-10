@@ -1,6 +1,7 @@
 import AbstractScrobbleClient from "./AbstractScrobbleClient.js";
 import request from 'superagent';
 import dayjs from 'dayjs';
+import compareVersions from 'compare-versions';
 import {
     buildTrackString,
     playObjDataMatch,
@@ -16,6 +17,8 @@ const feat = ["ft.", "ft", "feat.", "feat", "featuring", "Ft.", "Ft", "Feat.", "
 export default class MalojaScrobbler extends AbstractScrobbleClient {
 
     requiresAuth = true;
+    ready = false;
+    serverVersion;
 
     constructor(name, config = {}, options = {}) {
         super('maloja', name, config, options);
@@ -28,14 +31,51 @@ export default class MalojaScrobbler extends AbstractScrobbleClient {
         }
     }
 
-    static formatPlayObj(obj) {
-        const {
-            artists,
+    static formatPlayObj(obj, serverVersion = undefined) {
+        let artists,
             title,
             album,
             duration,
-            time,
-        } = obj;
+            time;
+
+        if(serverVersion === undefined || compareVersions(serverVersion, '3.0.0') >= 0) {
+            // scrobble data structure changed for v3
+            const {
+                // when the track was scrobbled
+                time: mTime,
+                track: {
+                    artists: mArtists,
+                    title: mTitle,
+                    album: {
+                        name: mAlbum,
+                        artists: albumArtists
+                    } = {},
+                    // length of the track
+                    length: mLength,
+                } = {},
+                // how long the track was listened to before it was scrobbled
+                duration: mDuration,
+            } = obj;
+            artists = mArtists;
+            time = mTime;
+            title = mTitle;
+            duration = mDuration;
+            album = mAlbum;
+        } else {
+            // scrobble data structure for v2 and below
+            const {
+                artists: mArtists,
+                title: mTitle,
+                album: mAlbum,
+                duration: mDuration,
+                time: mTime,
+            } = obj;
+            artists = mArtists;
+            title = mTitle;
+            album = mAlbum;
+            duration = mDuration;
+            time = mTime;
+        }
         let artistStrings = artists.reduce((acc, curr) => {
             let aString;
             if (typeof curr === 'string') {
@@ -60,7 +100,7 @@ export default class MalojaScrobbler extends AbstractScrobbleClient {
         }
     }
 
-    formatPlayObj = obj => MalojaScrobbler.formatPlayObj(obj);
+    formatPlayObj = obj => MalojaScrobbler.formatPlayObj(obj, this.serverVersion);
 
     callApi = async (req, retries = 0) => {
         const {
@@ -107,25 +147,62 @@ export default class MalojaScrobbler extends AbstractScrobbleClient {
             } = serverInfoResp;
 
             if (statusCode >= 300) {
-                this.logger.info('Test connection failed');
+                this.logger.info(`Communication test not OK! HTTP Status => Expected: 200 | Received: ${statusCode}`);
                 return false;
             }
 
-            this.logger.info('Test connection succeeded!');
+            this.logger.info('Communication test succeeded.');
 
             if (version.length === 0) {
-                this.logger.warn('Server did not respond with a version. Either the base URL is incorrect or this Maloja server is too old :(');
+                this.logger.warn('Server did not respond with a version. Either the base URL is incorrect or this Maloja server is too old. multi-scrobbler will most likely not work with this server.');
             } else {
                 this.logger.info(`Maloja Server Version: ${versionstring}`);
-                if (version[0] < 2 || version[1] < 7) {
+                this.serverVersion = versionstring;
+                if(compareVersions(versionstring, '2.7.0') < 0) {
                     this.logger.warn('Maloja Server Version is less than 2.7, please upgrade to ensure compatibility');
                 }
             }
             return true;
         } catch (e) {
-            this.logger.error('Testing connection failed');
+            this.logger.error('Communication test failed');
             this.logger.error(e);
             return false;
+        }
+    }
+
+    testHealth = async () => {
+
+        const {url} = this.config;
+        try {
+            const serverInfoResp = await this.callApi(request.get(`${url}/apis/mlj_1/serverinfo`), {maxRequestRetries: 0});
+            const {
+                statusCode,
+                body: {
+                    db_status: {
+                        healthy = false,
+                        rebuildinprogress = false,
+                        complete = false,
+                    }
+                } = {},
+            } = serverInfoResp;
+
+            if (statusCode >= 300) {
+                return [false, `Server responded with NOT OK status: ${statusCode}`];
+            }
+
+            if(rebuildinprogress) {
+                return [false, 'Server is rebuilding database'];
+            }
+
+            if(!healthy) {
+                return [false, 'Server responded that it is not healthy'];
+            }
+
+            return [true];
+        } catch (e) {
+            this.logger.error('Unexpected error encountered while testing server health');
+            this.logger.error(e);
+            throw e;
         }
     }
 
@@ -135,7 +212,7 @@ export default class MalojaScrobbler extends AbstractScrobbleClient {
         return this.initialized;
     }
 
-    testAuth = async (withKey = true) => {
+    testAuth = async () => {
 
         const {url, apiKey} = this.config;
         try {
@@ -163,11 +240,44 @@ export default class MalojaScrobbler extends AbstractScrobbleClient {
                 });
             }
         } catch (e) {
+            if(e.status === 403) {
+                // may be an older version that doesn't support auth readiness before db upgrade
+                // and if it was before api was accessible during db build then test would fail during testConnection()
+                if(compareVersions(this.serverVersion, '2.12.19') < 0) {
+                    if(!(await this.isReady())) {
+                        this.logger.error(`Could not test auth because server is not ready`);
+                        this.authed = false;
+                        return this.authed;
+                    }
+                }
+            }
             this.logger.error('Auth test failed');
             this.logger.error(e);
             this.authed = false;
         }
         return this.authed;
+    }
+
+    isReady = async () => {
+        if (this.ready) {
+            return this.ready;
+        }
+
+        try {
+            const [isHealthy, status] = await this.testHealth();
+            if (!isHealthy) {
+                this.logger.error(`Server is not ready: ${status}`);
+                this.ready = false;
+                return this.ready;
+            }
+            this.logger.info('Server reported database is built and status is healthy');
+            this.ready = true;
+            return this.ready;
+        } catch (e) {
+            this.logger.error(`Testing server health failed due to an unexpected error`);
+            this.ready = false;
+            return this.ready;
+        }
     }
 
     refreshScrobbles = async () => {
@@ -180,7 +290,7 @@ export default class MalojaScrobbler extends AbstractScrobbleClient {
                     list = [],
                 } = {},
             } = resp;
-            this.recentScrobbles = list.map(x => MalojaScrobbler.formatPlayObj(x)).sort(sortByPlayDate);
+            this.recentScrobbles = list.map(x => this.formatPlayObj(x)).sort(sortByPlayDate);
             if (this.recentScrobbles.length > 0) {
                 const [{data: {playDate: newestScrobbleTime = dayjs()} = {}} = {}] = this.recentScrobbles.slice(-1);
                 const [{data: {playDate: oldestScrobbleTime = dayjs()} = {}} = {}] = this.recentScrobbles.slice(0, 1);
@@ -373,35 +483,73 @@ export default class MalojaScrobbler extends AbstractScrobbleClient {
 
         const sType = newFromSource ? 'New' : 'Backlog';
 
+        const scrobbleData = {
+            title: track,
+            album,
+            key: apiKey,
+            time: playDate.unix(),
+            // https://github.com/FoxxMD/multi-scrobbler/issues/42#issuecomment-1100184135
+            length: duration,
+        };
+
         try {
+            // 3.0.3 has a BC for something (maybe seconds => length ?) -- see #42 in repo
+            if(this.serverVersion === undefined || compareVersions(this.serverVersion, '3.0.2') > 0) {
+                scrobbleData.artists = artists;
+            } else {
+                // maloja seems to detect this deliminator much better than commas
+                // also less likely artist has a forward slash in their name than a comma
+                scrobbleData.artist = artists.join(' / ');
+            }
+
             const response = await this.callApi(request.post(`${url}/apis/mlj_1/newscrobble`)
                 .type('json')
-                .send({
-                    // maloja seems to detect this deliminator much better than commas
-                    // also less likely artist has a forward slash in their name than a comma
-                    artist: artists.join(' / '),
-                    seconds: duration,
-                    title: track,
-                    album,
-                    key: apiKey,
+                .send(scrobbleData));
+
+            let scrobbleResponse = {};
+
+            if(this.serverVersion === undefined || compareVersions(this.serverVersion, '3.0.0') >= 0) {
+                const {
+                    body: {
+                    track,
+                } = {}
+                } = response;
+                scrobbleResponse = {
                     time: playDate.unix(),
-                }));
-            const {body: {
-                track: {
-                    time: mTime = playDate.unix(),
-                    duration: mDuration = duration,
-                    album: mAlbum = album,
-                    ...rest
+                    track: {
+                        ...track,
+                        length: duration
+                    },
                 }
-            } = {}} = response;
-            this.addScrobbledTrack(playObj, {...rest, album: mAlbum, time: mTime, duration: mDuration});
+                if(album !== undefined) {
+                    const {
+                        album: malojaAlbum = {},
+                    } = track;
+                    scrobbleResponse.track.album = {
+                        ...malojaAlbum,
+                        name: album
+                    }
+                }
+            } else {
+                const {body: {
+                    track: {
+                        time: mTime = playDate.unix(),
+                        duration: mDuration = duration,
+                        album: mAlbum = album,
+                        ...rest
+                    }
+                } = {}} = response;
+                scrobbleResponse = {...rest, album: mAlbum, time: mTime, duration: mDuration};
+            }
+            this.addScrobbledTrack(playObj, scrobbleResponse);
             if (newFromSource) {
                 this.logger.info(`Scrobbled (New)     => (${source}) ${buildTrackString(playObj)}`);
             } else {
                 this.logger.info(`Scrobbled (Backlog) => (${source}) ${buildTrackString(playObj)}`);
             }
+            this.logger.debug('Payload:', scrobbleData);
         } catch (e) {
-            this.logger.error(`Scrobble Error (${sType})`, {playInfo: buildTrackString(playObj)});
+            this.logger.error(`Scrobble Error (${sType})`, {playInfo: buildTrackString(playObj), payload: scrobbleData});
             throw e;
         }
 
