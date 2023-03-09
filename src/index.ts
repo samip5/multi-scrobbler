@@ -41,6 +41,7 @@ import {AIOConfig} from "./common/infrastructure/config/aioConfig.js";
 import createRoot from "./ioc.js";
 import {formatLogToHtml, getLogger, isLogLineMinLevel} from "./common/logging.js";
 import {MESSAGE} from "triple-beam";
+import AppleSource from "./sources/AppleSource.js";
 
 
 dayjs.extend(utc)
@@ -566,7 +567,7 @@ const configDir = process.env.CONFIG_DIR || path.resolve(projectDir, `./config`)
                         token
                     } = {}
                 } = req;
-                const entity = scrobbleSources.getByName(state);
+                const entity = scrobbleSources.getByName(state) as AppleSource;
                await entity.handleAuthCodeCallback({token});
                const recentPlays = await entity.apiClient.getRecentlyPlayed(20, 0, "songs");
                const f = 1;
