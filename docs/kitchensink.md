@@ -6,11 +6,13 @@ Scenario:
 * Each person has their own Maloja server
 * Each person has their own Spotify account
 * You have your own Airsonic (subsonic) server you to scrobble from
+* You have your own Youtube Music account you want to scrobble from
 * Mary has her own Last.fm account she also wants to scrobble to
 * Fred has his own Spotify application and provides you with just his access and refresh token because he doesn't trust you (wtf Fred)
 * Fred has a Plex server and wants to scrobble everything he plays
 * Mary uses Fred's Plex server but only wants to scrobble her plays from the `podcast` library
 * The three of you have a shared library on Plex called `party` that you only play when you are hanging out. You want plays from that library to be scrobbled to everyone's servers.
+* Fred also has his own Jellyfin server and wants to scrobble everything he plays
 
 ### All-in-one Config
 
@@ -83,6 +85,14 @@ Using just one config file located at `CONFIG_DIR/config.json`:
       }
     },
     {
+      "type": "jellyfin",
+      "name": "FredJelly",
+      // omitting clients (or making it empty) will make this Source scrobble to all Clients
+      "data": {
+        "user": ["fred@email.com"]
+      }
+    },
+    {
       "type": "subsonic",
       "name": "foxxAirsonic",
       "clients": ["foxxMaloja"],
@@ -90,6 +100,15 @@ Using just one config file located at `CONFIG_DIR/config.json`:
         "user": "foxx",
         "password": "foxxPassword",
         "url": "https://airsonic.foxx.example"
+      }
+    },
+    {
+      "type": "ytmusic",
+      "name": "foxxYoutube",
+      "clients": ["foxxMaloja"],
+      "data": {
+        "cookie": "__Secure-3PAPISID=3AxsXpy0MKGu75Qb/AkISXGqOnSDn1jEKn; DEVICE_INFO=ChxOekU0Tmpjek5EWTBPRGd3TlRBMk16QXpNdz09EJbS8Z0GGJbS8Z0G; ...",
+        "authUser": 1
       }
     },
   ],
@@ -124,6 +143,7 @@ Using just one config file located at `CONFIG_DIR/config.json`:
       "data": {
         "apiKey": "maryApiKey",
         "secret": "marySecret",
+        "redirectUri": "http://localhost:9078/lastfm/callback"
       }
     }
   ]
@@ -143,7 +163,7 @@ In `CONFIG_DIR/spotify.json`:
     "clients": ["foxxMaloja"],
     "data": {
       "clientId": "foxxSpotifyAppId",
-      "clientSecret": "foxxSpotifyAppSecret",
+      "clientSecret": "foxxSpotifyAppSecret"
     }
   },
   {
@@ -151,7 +171,7 @@ In `CONFIG_DIR/spotify.json`:
     "clients": ["maryMaloja"],
     "data": {
       "clientId": "foxxSpotifyAppId",
-      "clientSecret": "foxxSpotifyAppSecret",
+      "clientSecret": "foxxSpotifyAppSecret"
     }
   },
   {
@@ -160,7 +180,7 @@ In `CONFIG_DIR/spotify.json`:
     "data": {
       "accessToken": "fredsToken",
       "refreshToken": "fredsRefreshToken",
-      "interval": 120,
+      "interval": 120
     }
   },
 ]
@@ -188,7 +208,36 @@ In `CONFIG_DIR/plex.json`
   {
     "name": "partyPlex",
     "data": {
-      "libraries": ["party"],
+      "libraries": ["party"]
+    }
+  }
+]
+```
+
+In `CONFIG_DIR/jellyfin.json`
+
+```json5
+[
+  {
+    "name": "FredJelly",
+    "data": {
+      "user": ["fred@email.com"]
+    }
+  }
+]
+```
+
+In `CONFIG_DIR/ytmusic.json`
+
+```json5
+[
+  {
+    "type": "ytmusic",
+    "name": "foxxYoutube",
+    "clients": ["foxxMaloja"],
+    "data": {
+      "cookie": "__Secure-3PAPISID=3AxsXpy0MKGu75Qb/AkISXGqOnSDn1jEKn; DEVICE_INFO=ChxOekU0Tmpjek5EWTBPRGd3TlRBMk16QXpNdz09EJbS8Z0GGJbS8Z0G; ...",
+      "authUser": 1
     }
   }
 ]
@@ -231,6 +280,7 @@ In `CONFIG_DIR/lastfm.json`:
     "data": {
       "apiKey": "maryApiKey",
       "secret": "marySecret",
+      "redirectUri": "http://localhost:9078/lastfm/callback"
     }
   }
 ]
