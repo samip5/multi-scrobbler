@@ -9,6 +9,7 @@ RUN \
     git \
     nodejs \
     npm \
+    dnsmasq \
     openssh && \
   echo "**** cleanup ****" && \
   rm -rf \
@@ -22,6 +23,10 @@ VOLUME $data_dir
 ENV CONFIG_DIR=$data_dir
 
 COPY docker/root/ /
+
+COPY docker/etc/ /etc/
+
+RUN rc-update add dnsmasq default
 
 WORKDIR /app
 
