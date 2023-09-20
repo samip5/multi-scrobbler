@@ -13,6 +13,7 @@ export interface LastfmSourceConfig extends CommonSourceConfig {
      * */
     configureAs?: 'source'
     data: LastFmSourceData
+    useAsParser?: boolean
 }
 
 export interface LastFmSouceAIOConfig extends LastfmSourceConfig {

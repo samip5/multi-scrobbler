@@ -536,6 +536,7 @@ export class ListenbrainzApiClient extends AbstractApiClient {
                 source: 'listenbrainz',
                 trackId,
                 playId,
+                mbid: trackId,
                 deviceId: combinePartsToString([music_service_name ?? music_service, submission_client, submission_client_version])
             }
         }

@@ -4,6 +4,7 @@ import { SourceAIOConfig } from "./source/sources";
 import { ClientAIOConfig } from "./client/clients";
 import { WebhookConfig } from "./health/webhooks";
 import { LogOptions } from "../Atomic";
+import {MetadataServices} from "./playMetadataServices.js";
 
 export interface SourceDefaults extends SourceRetryOptions {
     /**
@@ -55,6 +56,8 @@ export interface AIOConfig {
      * @examples [false]
      * */
     debugMode?: boolean
+
+    metadataServices?: MetadataServices
 }
 
 export interface AIOClientConfig {

@@ -1026,3 +1026,64 @@ export const getAddress = (host = '0.0.0.0', logger?: Logger): { v4?: string, v6
         v6
     };
 }
+
+export const extractArtists = (artistStr: string): string[] => {
+    let cleanArtists: string[] = [];
+
+    // be conservative and assume artist string with & are proper names (not joiner)
+    const parsedArtists = parseCredits(artistStr, [',', '/', '\\']);
+    if (parsedArtists !== undefined) {
+        if (parsedArtists.primary !== undefined) {
+            cleanArtists.push(parsedArtists.primary);
+        }
+        cleanArtists = cleanArtists.concat(parsedArtists.secondary);
+    }
+    return uniqueNormalizedStrArr(cleanArtists);
+}
+
+export const extractTitleAndArtists = (titleStr: string): { title: string, artists: string[] } => {
+
+    let cleanTitle = titleStr;
+    let cleanArtists: string[] = [];
+
+    // use all delimiters when trying to find artists in track name
+    const parsedTrackArtists = parseCredits(titleStr);
+    if (parsedTrackArtists !== undefined) {
+        // if we found "ft. something" in track string then we now have a "real" track name and more artists
+        cleanTitle = parsedTrackArtists.primary;
+        cleanArtists = uniqueNormalizedStrArr(cleanArtists.concat(parsedTrackArtists.secondary));
+    }
+
+    return {title: cleanTitle, artists: cleanArtists};
+}
+
+export const extractPlayData = (play: PlayObject) => {
+    const {
+        data: {
+            artists,
+            track
+        }
+    } = play;
+
+    let cleanArtists: string[] = artists,
+        cleanTitle: string = track;
+
+    // for now, assume that if there is more than one artist than the artists are already properly presented
+    if (cleanArtists.length === 1) {
+        const parsedArtists = extractArtists(artists[0]);
+        cleanArtists = cleanArtists.concat(parsedArtists);
+    }
+
+    const parsedTrackInfo = extractTitleAndArtists(track);
+    cleanTitle = parsedTrackInfo.title;
+    cleanArtists = uniqueNormalizedStrArr(cleanArtists.concat(parsedTrackInfo.artists));
+
+    return {
+        ...play,
+        data: {
+            ...play.data,
+            artists: cleanArtists,
+            track: cleanTitle
+        }
+    }
+}

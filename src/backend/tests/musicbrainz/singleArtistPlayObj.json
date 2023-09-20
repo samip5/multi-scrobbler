@@ -1,0 +1,25 @@
+[
+  {
+    "play": {
+      "data": {
+        "playDate": "2023-09-20T18:59:41.000Z",
+        "track": "Vitamina",
+        "artists": [
+          "Noro Morales"
+        ],
+        "duration": 156
+      },
+      "meta": {
+        "source": "listenbrainz",
+        "trackId": "7a42b5a0-cb5d-4379-919b-fae586f60bea",
+        "playId": "27fb9285-3721-48b4-a7f0-8d921e23f9a2"
+      }
+    },
+    "expected": {
+      "artists": [
+        "Noro Morales"
+      ],
+      "track": "Vitamina"
+    }
+  }
+]

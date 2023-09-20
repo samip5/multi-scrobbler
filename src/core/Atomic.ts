@@ -114,6 +114,11 @@ export interface PlayMeta {
 
     nowPlaying?: boolean
 
+    /**
+     * A MusicBrainz Recording ID
+     * */
+    mbid?: string
+
     [key: string]: any
 }
 
