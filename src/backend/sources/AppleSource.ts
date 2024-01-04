@@ -100,7 +100,8 @@ export class AppleSource extends MemorySource {
             data: {
                 artists: [artist],
                 album,
-                duration: duration / 1000
+                track: tittle,
+                duration: duration / 1000 // It's actually milliseconds.
             },
             meta: {
                 source: 'Apple',
@@ -110,18 +111,12 @@ export class AppleSource extends MemorySource {
         }
     }
 
-    // @ts-ignore
     getRecentlyPlayed = async(options: RecentlyPlayedOptions = {})=> {
         const {formatted = false} = options;
         const resp = await this.apiClient.getRecentlyPlayed(20, 0, "songs");
-        const {
-            body: {
-               data = []
-            } = {}
-        } = resp;
-        const currentData = data.map(AppleSource.formatPlayObj);
+        const currentData = resp.body.data.map(AppleSource.formatPlayObj);
         this.logger.debug(`RecentlyPlayedData: ${currentData}`);
-        return this.processRecentPlays(data);
+        return this.processRecentPlays(currentData);
     }
 
     doAuthentication = async () => {
