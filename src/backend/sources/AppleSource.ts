@@ -1,10 +1,12 @@
 import MemorySource from "./MemorySource";
 import {AppleMusicSourceConfig} from "../common/infrastructure/config/source/apple";
-import {InternalConfig} from "../common/infrastructure/Atomic";
+import {FormatPlayObjectOptions, InternalConfig} from "../common/infrastructure/Atomic";
 import EventEmitter from "events";
 import {readJson, readText, writeFile} from "../utils";
 import MusicKit from 'node-musickit-api/personalized/index.js';
 import {createJWT} from 'node-musickit-api/modules/createJWT.js';
+import {RecentlyPlayedOptions} from "./AbstractSource";
+import {PlayObject} from "../../core/Atomic";
 
 
 export class AppleSource extends MemorySource {
@@ -24,7 +26,8 @@ export class AppleSource extends MemorySource {
     constructor(name: any, config: AppleMusicSourceConfig, internal: InternalConfig, emitter: EventEmitter) {
         super('apple', name, config, internal, emitter);
 
-        this.workingCredsPath = `${internal.configDir}/currentCreds-apple-${name}.json`;
+        this.workingCredsPath = `${internal.configDir}/currentCreds-apple-${name}.json`
+        this.logger.debug(`APPLE workingCredsPath: ${internal.configDir}/currentCreds-apple-${name}.json`);
     }
 
     initialize = async () => {
@@ -79,6 +82,58 @@ export class AppleSource extends MemorySource {
 
         this.initialized = true;
         return true;
+    }
+
+
+    static formatPlayObj(obj: any, options: FormatPlayObjectOptions = {}): PlayObject {
+        const {newFromSource = false} = options;
+        const {
+            id,
+            attributes: {
+                name: tittle,
+                albumName: album,
+                artistName: artist,
+                durationInMillis: duration
+            }
+        } = obj;
+        return {
+            data: {
+                artists: [artist],
+                album,
+                duration: duration / 1000
+            },
+            meta: {
+                source: 'Apple',
+                trackId: id,
+                newFromSource
+            }
+        }
+    }
+
+    // @ts-ignore
+    getRecentlyPlayed = async(options: RecentlyPlayedOptions = {})=> {
+        const {formatted = false} = options;
+        const resp = await this.apiClient.getRecentlyPlayed(20, 0, "songs");
+        const {
+            body: {
+               data = []
+            } = {}
+        } = resp;
+        const currentData = data.map(AppleSource.formatPlayObj);
+        this.logger.debug(`RecentlyPlayedData: ${currentData}`);
+        return this.processRecentPlays(data);
+    }
+
+    doAuthentication = async () => {
+       try {
+           const credFile = await readJson(this.workingCredsPath, {throwOnNotFound: false});
+           if (credFile !== undefined)  {
+               return true;
+           }
+       } catch (e) {
+          this.logger.warn('Error occurred with reading APPLE credentials', {path: this.workingCredsPath});
+          return false;
+       }
     }
 
     generateDeveloperToken = () => {

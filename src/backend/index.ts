@@ -152,6 +152,8 @@ const configDir = process.env.CONFIG_DIR || path.resolve(projectDir, `./config`)
         // do something with the authorized apple source api client
         //const apl = scrobbleSources.getByName('aap') as AppleSource;
         //const recentPlays = await apl.apiClient.getRecentlyPlayed(20, 0, "songs");
+        //console.log(`Recent: ${JSON.stringify(recentPlays, null, 2)}`);
+
 
         scheduler.addSimpleIntervalJob(new SimpleIntervalJob({
             minutes: 20,
